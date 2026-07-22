@@ -3,7 +3,7 @@ import { StyleSheet, View, ScrollView, TouchableWithoutFeedback, Keyboard } from
 import { Card, Checkbox, Text, TextInput, Button, IconButton } from "react-native-paper";
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/todos";
+const API_URL = "http://10.178.151.211:5000/api/todos";
 
 export default function TodoList({ userEmail }) {
   const [todos, setTodos] = useState([]);

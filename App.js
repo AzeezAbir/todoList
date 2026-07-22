@@ -6,7 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import TodoList from "./TodoList";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "http://10.178.151.211:5000/api";
 
 export default function App() {
   const [user, setUser] = useState(null);
