@@ -3,7 +3,10 @@ import React, { useState, useEffect } from "react";
 import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { PaperProvider, Appbar, TextInput, Button, Text, HelperText } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 import TodoList from "./TodoList";
+
+const API_URL = "http://localhost:5000/api";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -14,7 +17,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user session exists on app load
     const checkSession = async () => {
       try {
         const session = await AsyncStorage.getItem("SESSION_USER");
@@ -37,31 +39,30 @@ export default function App() {
       return;
     }
 
-    const emailKey = `USER_${email.toLowerCase().trim()}`;
-
     try {
       if (isSignUp) {
-        // Sign Up
-        const existingUser = await AsyncStorage.getItem(emailKey);
-        if (existingUser) {
-          setError("User already exists!");
-          return;
-        }
-        await AsyncStorage.setItem(emailKey, password);
-        await AsyncStorage.setItem("SESSION_USER", email);
-        setUser(email);
+        const response = await axios.post(`${API_URL}/auth/register`, {
+          email: email.toLowerCase().trim(),
+          password: password,
+        });
+        const userEmail = response.data.email;
+        await AsyncStorage.setItem("SESSION_USER", userEmail);
+        setUser(userEmail);
       } else {
-        // Sign In
-        const storedPassword = await AsyncStorage.getItem(emailKey);
-        if (storedPassword === password) {
-          await AsyncStorage.setItem("SESSION_USER", email);
-          setUser(email);
-        } else {
-          setError("Invalid email or password");
-        }
+        const response = await axios.post(`${API_URL}/auth/login`, {
+          email: email.toLowerCase().trim(),
+          password: password,
+        });
+        const userEmail = response.data.email;
+        await AsyncStorage.setItem("SESSION_USER", userEmail);
+        setUser(userEmail);
       }
-    } catch (e) {
-      setError("Authentication failed. Please try again.");
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError("Network error. Make sure your server is running.");
+      }
     }
   };
 
@@ -78,7 +79,7 @@ export default function App() {
   };
 
   if (loading) {
-    return null; // Don't render until checking session is complete
+    return null;
   }
 
   return (
@@ -94,7 +95,7 @@ export default function App() {
             <TodoList userEmail={user} />
           ) : (
             <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
               style={styles.authContainer}
             >
               <ScrollView contentContainerStyle={styles.authContent}>

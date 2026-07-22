@@ -1,71 +1,65 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, View, ScrollView, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { Card, Checkbox, Text, TextInput, Button, IconButton } from "react-native-paper";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+
+const API_URL = "http://localhost:5000/api/todos";
 
 export default function TodoList({ userEmail }) {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
 
-  const storageKey = `TODOS_${userEmail.toLowerCase().trim()}`;
-
-  // Load todos from AsyncStorage on mount/user change
+  // Load todos from MongoDB on mount/user change
   useEffect(() => {
-    const loadTodos = async () => {
+    const fetchTodos = async () => {
       try {
-        const stored = await AsyncStorage.getItem(storageKey);
-        if (stored) {
-          setTodos(JSON.parse(stored));
-        } else {
-          // Default initial items for new users
-          // const initial = [
-          //   { id: 1, text: "Sleep on Grass", completed: false },
-          //   { id: 2, text: "Feed the Chicken", completed: true },
-          //   { id: 3, text: "Go for a walk", completed: false },
-          //   { id: 4, text: "Collect fresh eggs", completed: false }
-          // ];
-          // setTodos(initial);
-          // await AsyncStorage.setItem(storageKey, JSON.stringify(initial));
-        }
+        const response = await axios.get(`${API_URL}?email=${userEmail}`);
+        setTodos(response.data);
       } catch (e) {
-        console.error("Failed to load todos", e);
+        console.error("Failed to fetch todos from server", e);
       }
     };
-    loadTodos();
+    fetchTodos();
   }, [userEmail]);
 
-  // Save changes to AsyncStorage
-  const saveTodos = async (updatedTodos) => {
-    setTodos(updatedTodos);
+  const handleAddTodo = async () => {
+    if (newTodo.trim() === "") return;
     try {
-      await AsyncStorage.setItem(storageKey, JSON.stringify(updatedTodos));
+      const response = await axios.post(API_URL, {
+        userEmail: userEmail.toLowerCase().trim(),
+        text: newTodo,
+      });
+      // response.data contains the new todo object saved in MongoDB (including its _id)
+      setTodos([...todos, response.data]);
+      setNewTodo("");
     } catch (e) {
-      console.error("Failed to save todos", e);
+      console.error("Failed to add todo", e);
     }
   };
 
-  const handleAddTodo = () => {
-    if (newTodo.trim() === "") return;
-    const item = {
-      id: Date.now(),
-      text: newTodo,
-      completed: false,
-    };
-    const updated = [...todos, item];
-    saveTodos(updated);
-    setNewTodo("");
+  const handleToggleTodo = async (id) => {
+    const todoToToggle = todos.find((todo) => todo._id === id);
+    if (!todoToToggle) return;
+
+    try {
+      const response = await axios.put(`${API_URL}/${id}`, {
+        completed: !todoToToggle.completed,
+      });
+      // Update local state with the returned updated todo from server
+      setTodos(todos.map((todo) => (todo._id === id ? response.data : todo)));
+    } catch (e) {
+      console.error("Failed to toggle todo", e);
+    }
   };
 
-  const handleToggleTodo = (id) => {
-    const updated = todos.map((todo) =>
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    );
-    saveTodos(updated);
-  };
-
-  const handleDeleteTodo = (id) => {
-    const updated = todos.filter((todo) => todo.id !== id);
-    saveTodos(updated);
+  const handleDeleteTodo = async (id) => {
+    try {
+      await axios.delete(`${API_URL}/${id}`);
+      // Remove it locally from state after a successful server deletion
+      setTodos(todos.filter((todo) => todo._id !== id));
+    } catch (e) {
+      console.error("Failed to delete todo", e);
+    }
   };
 
   return (
@@ -90,15 +84,15 @@ export default function TodoList({ userEmail }) {
 
         <ScrollView contentContainerStyle={styles.listContainer}>
           {todos.map((todo) => (
-            <Card key={todo.id} style={styles.card} mode="outlined">
+            <Card key={todo._id} style={styles.card} mode="outlined">
               <Card.Content style={styles.cardContent}>
                 <Checkbox
                   status={todo.completed ? "checked" : "unchecked"}
-                  onPress={() => handleToggleTodo(todo.id)}
+                  onPress={() => handleToggleTodo(todo._id)}
                 />
                 
                 <Text 
-                  onPress={() => handleToggleTodo(todo.id)}
+                  onPress={() => handleToggleTodo(todo._id)}
                   style={[styles.todoText, todo.completed && styles.completedText]}
                 >
                   {todo.text}
@@ -108,7 +102,7 @@ export default function TodoList({ userEmail }) {
                   icon="delete"
                   size={20}
                   iconColor="#ff4d4f"
-                  onPress={() => handleDeleteTodo(todo.id)}
+                  onPress={() => handleDeleteTodo(todo._id)}
                   style={styles.deleteButton}
                 />
               </Card.Content>
